@@ -46,7 +46,7 @@ public class ExoPlayerRecyclerViewActivity01 extends Activity {
 
         appContext = getApplicationContext();
 
-        for (int index = 0; index < 10; index++) {
+        for (int index = 0; index < 100; index++) {
             videoInfoList.add(new VideoInfo("http://html5demos.com/assets/dizzy.mp4"));
         }
 

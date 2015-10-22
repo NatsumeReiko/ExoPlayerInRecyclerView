@@ -16,25 +16,27 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/root"
     android:layout_width="match_parent"
-    android:layout_height="240dp"
+    android:layout_height="wrap_content"
     android:background="#888"
     android:focusable="true"
     android:keepScreenOn="true">
 
-    <com.google.android.exoplayer.AspectRatioFrameLayout
+
+    <FrameLayout
         android:id="@+id/video_frame"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/exoplayer_video_height"
-        android:layout_gravity="center"
-        tools:background="#ff000f">
+        android:layout_height="wrap_content">
 
-        <ImageView
+        <recyclerview.in.exoplayer.exoplayerinrecyclerview.SquareImageView
+            android:id="@+id/thumbnail"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
+            android:adjustViewBounds="true"
+            android:background="@android:color/black"
+            android:scaleType="fitCenter"
             android:src="@drawable/gallery_photo_8" />
 
-
-    </com.google.android.exoplayer.AspectRatioFrameLayout>
+    </FrameLayout>
 
 
 </FrameLayout>

@@ -21,8 +21,7 @@ import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-
-import com.google.android.exoplayer.AspectRatioFrameLayout;
+import android.widget.FrameLayout;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,15 +37,6 @@ public class ExoPlayerVideoRecyclerViewAdapter
         this.videoInfoList = videoInfoList;
         inflater = LayoutInflater.from(appContext.getApplicationContext());
 
-    }
-
-    public VideoInfo getItem(int position) {
-
-        if (position < videoInfoList.size()) {
-            return videoInfoList.get(position);
-        }
-
-        return null;
     }
 
     @Override
@@ -74,13 +64,13 @@ public class ExoPlayerVideoRecyclerViewAdapter
 
     public static class VideoViewHolder extends RecyclerView.ViewHolder {
 
-        AspectRatioFrameLayout videoContainer;
+        FrameLayout videoContainer;
         View parent;
 
         public VideoViewHolder(View v) {
             super(v);
             parent = v;
-            videoContainer = (AspectRatioFrameLayout) v.findViewById(R.id.video_frame);
+            videoContainer = (FrameLayout) v.findViewById(R.id.video_frame);
         }
     }
 

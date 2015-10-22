@@ -23,15 +23,14 @@ import android.os.Handler;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
-import android.util.TypedValue;
+import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
-import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AbsListView;
+import android.widget.FrameLayout;
 
-import com.google.android.exoplayer.AspectRatioFrameLayout;
 import com.google.android.exoplayer.ExoPlaybackException;
 import com.google.android.exoplayer.ExoPlayer;
 import com.google.android.exoplayer.MediaCodecAudioTrackRenderer;
@@ -64,7 +63,7 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView
     private List<VideoInfo> videoInfoList = new ArrayList<>();
 
     //surface view for playing video
-    private SurfaceView videoSurfaceView;
+    private CustomVideoSurfaceView videoSurfaceView;
 
     private boolean surfaceViewViable = false;
 
@@ -76,7 +75,7 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView
     private Handler mainHandler;
     private Allocator allocator;
     private DataSource dataSource;
-    private AspectRatioFrameLayout videoFrame;
+    private FrameLayout videoFrame;
 
     private Context appContext;
 
@@ -153,20 +152,21 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView
 
         // Build the ExoPlayer and start playback
         player.prepare(videoRenderer, audioRenderer);
+        player.setPlayWhenReady(true);
 
         playVideo();
     }
 
-    //method to realy do the play
+    //method to actually do the play
     private void playVideo() {
         if (surfaceViewViable) {
             player.sendMessage(videoRenderer,
                     MediaCodecVideoTrackRenderer.MSG_SET_SURFACE,
-                    videoSurfaceView.getHolder().getSurface());
-            player.setPlayWhenReady(true);
+                    videoSurfaceView.getSurface());
         }
     }
 
+    //release the player
     private void releasePlayer() {
         if (player != null) {
             player.release();
@@ -174,7 +174,8 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView
         }
     }
 
-    private void removeVideoView(SurfaceView videoView) {
+    //remove the player from the row
+    private void removeVideoView(CustomVideoSurfaceView videoView) {
 
         ViewGroup parent = (ViewGroup) videoView.getParent();
 
@@ -189,6 +190,7 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView
 
     }
 
+    //play the video in the row
     private void play(int position) {
         if (position == playPosition) {
             return;
@@ -211,6 +213,7 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView
             playPosition = DEFAULT_PLAY_POSITION;
             return;
         }
+
         holder.videoContainer.addView(videoSurfaceView);
         videoFrame = holder.videoContainer;
 
@@ -230,14 +233,14 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView
                         Util.getUserAgent(appContext, "ExoPlayerDemo"));
 
 
-        videoSurfaceView = new SurfaceView(appContext);
+        videoSurfaceView = new CustomVideoSurfaceView(appContext);
 
-        videoSurfaceView.setLayoutParams(new ViewGroup.LayoutParams(LayoutParams.MATCH_PARENT,
-                (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
-                        getResources().getDimension(R.dimen.exoplayer_video_height)
-                        , getResources().getDisplayMetrics())));
+//        videoSurfaceView.setLayoutParams(new ViewGroup.LayoutParams(LayoutParams.MATCH_PARENT,
+//                (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
+//                        getResources().getDimension(R.dimen.exoplayer_video_height)
+//                        , getResources().getDisplayMetrics())));
 
-        videoSurfaceView.getHolder().addCallback(this);
+        videoSurfaceView.getSurfaceHold().addCallback(this);
 
         CookieHandler currentHandler = CookieHandler.getDefault();
         if (currentHandler != defaultCookieManager) {
@@ -251,21 +254,31 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView
         player.addListener(new ExoPlayer.Listener() {
             @Override
             public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+                String text = "playWhenReady=" + playWhenReady + ", playbackState=";
                 switch (playbackState) {
                     case ExoPlayer.STATE_BUFFERING:
+                        text += "buffering";
                         break;
                     case ExoPlayer.STATE_ENDED:
                         player.seekTo(0);
+                        text += "ended";
                         break;
                     case ExoPlayer.STATE_IDLE:
+                        text += "idle";
                         break;
                     case ExoPlayer.STATE_PREPARING:
+                        text += "preparing";
                         break;
                     case ExoPlayer.STATE_READY:
+                        text += "ready";
                         break;
                     default:
+                        text += "unknown";
                         break;
                 }
+
+                Log.d("20672067",text);
+
             }
 
             @Override
@@ -328,6 +341,7 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
+        Log.d("20672067", "surfaceCreated");
         surfaceViewViable = true;
         playVideo();
     }
@@ -339,6 +353,8 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
+        Log.d("20672067", "surfaceDestroyed");
+
         surfaceViewViable = false;
     }
 
@@ -349,10 +365,23 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView
 
     @Override
     public void onVideoSizeChanged(int width, int height, int unappliedRotationDegrees, float pixelWidthHeightRatio) {
-        if (videoFrame != null) {
-            videoFrame.setAspectRatio(
-                    height == 0 ? 1 : (width * pixelWidthHeightRatio) / height);
-        }
+        Log.d("20672067", "onVideoSizeChanged:" + pixelWidthHeightRatio);
+        Log.d("20672067", "width:" + width);
+        Log.d("20672067", "height:" + height);
+        videoSurfaceView.calculateAspectRatio(width, height);
+
+//        videoSurfaceView.getHolder().setFixedSize(300, 300);
+
+//        videoSurfaceView.setLayoutParams(new ViewGroup.LayoutParams(300,300));
+
+
+//        if (videoFrame != null) {
+//            final float widthHeightRatio = height == 0 ? 1 : (width * pixelWidthHeightRatio) / height;
+//            Log.d("20672067", "widthHeightRatio:" + widthHeightRatio);
+//
+//            videoFrame.setAspectRatio(
+//             width,  height);
+//        }
     }
 
     @Override
