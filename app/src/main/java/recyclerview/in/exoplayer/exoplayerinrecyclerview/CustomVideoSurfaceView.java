@@ -2,25 +2,103 @@ package recyclerview.in.exoplayer.exoplayerinrecyclerview;
 
 import android.content.Context;
 import android.graphics.Point;
-import android.graphics.SurfaceTexture;
+import android.media.MediaCodec;
+import android.net.Uri;
+import android.os.Handler;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 
+import com.google.android.exoplayer.ExoPlaybackException;
+import com.google.android.exoplayer.ExoPlayer;
+import com.google.android.exoplayer.MediaCodecAudioTrackRenderer;
+import com.google.android.exoplayer.MediaCodecTrackRenderer;
+import com.google.android.exoplayer.MediaCodecVideoTrackRenderer;
+import com.google.android.exoplayer.audio.AudioCapabilities;
+import com.google.android.exoplayer.audio.AudioCapabilitiesReceiver;
+import com.google.android.exoplayer.extractor.ExtractorSampleSource;
+import com.google.android.exoplayer.upstream.Allocator;
+import com.google.android.exoplayer.upstream.DataSource;
+import com.google.android.exoplayer.upstream.DefaultAllocator;
+import com.google.android.exoplayer.upstream.DefaultBandwidthMeter;
+import com.google.android.exoplayer.upstream.DefaultUriDataSource;
+import com.google.android.exoplayer.util.Util;
+
+import java.net.CookieHandler;
+import java.net.CookieManager;
+import java.net.CookiePolicy;
+
 /**
  * リストでの動画再生用にカスタマイズした特殊な{@link android.view.View View}。
  */
-public class CustomVideoSurfaceView extends FrameLayout implements TextureView.SurfaceTextureListener, View.OnClickListener {
+public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabilitiesReceiver.Listener, MediaCodecVideoTrackRenderer.EventListener,
+        SurfaceHolder.Callback, View.OnClickListener {
+
+    //fields about video
+    private AudioCapabilitiesReceiver audioCapabilitiesReceiver;
+    private ExoPlayer player;
+    private static final CookieManager defaultCookieManager;
+    private ExtractorSampleSource sampleSource;
+    private Handler mainHandler;
+    private Allocator allocator;
+    private DataSource dataSource;
+
+    private MediaCodecVideoTrackRenderer videoRenderer;
+    private MediaCodecAudioTrackRenderer audioRenderer;
+    private boolean surfaceViewViable = false;
+
+    static {
+        defaultCookieManager = new CookieManager();
+        defaultCookieManager.setCookiePolicy(CookiePolicy.ACCEPT_ORIGINAL_SERVER);
+    }
+
+    private Context appContext;
+
+    public void preparePlayer(Uri uri) {
+
+
+        // Build the sample source
+        sampleSource =
+                new ExtractorSampleSource(uri, dataSource, allocator, 10 * BUFFER_SEGMENT_SIZE);
+
+        // Build the track renderers
+        videoRenderer = new MediaCodecVideoTrackRenderer(sampleSource,
+                MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT, -1, mainHandler, this, -1);
+        audioRenderer = new MediaCodecAudioTrackRenderer(sampleSource);
+
+        // Build the ExoPlayer and start playback
+        player.prepare(videoRenderer, audioRenderer);
+        player.setPlayWhenReady(true);
+
+        playVideo();
+    }
+
+    //method to actually do the play
+    private void playVideo() {
+        if (surfaceViewViable) {
+            player.sendMessage(videoRenderer,
+                    MediaCodecVideoTrackRenderer.MSG_SET_SURFACE,
+                    videoSurfaceView.getHolder().getSurface());
+        }
+    }
+
+    //release the player
+    private void releasePlayer() {
+        if (player != null) {
+            player.release();
+            player = null;
+        }
+    }
 
 
     /**
@@ -29,11 +107,34 @@ public class CustomVideoSurfaceView extends FrameLayout implements TextureView.S
     protected static final boolean USE_DISK_CACHE = true;
     private static final int PROGRESS_SIZE = 50;
 
+    private static final int DEFAULT_PLAY_POSITION = -1;
+    private static final int BUFFER_SEGMENT_SIZE = 64 * 1024;
+
     /**
      * DiskCacheの最大容量。
      * とりあえず1GB。
      */
     protected static final int DISK_CACHE_MAX_SIZE = 1 * 1024 * 1024 * 1024;
+
+    /**
+     * release memory
+     */
+    public void onRelease() {
+        audioCapabilitiesReceiver.unregister();
+
+        releasePlayer();
+
+        if (mainHandler != null) {
+            mainHandler = null;
+        }
+
+        allocator = null;
+        dataSource = null;
+        videoRenderer = null;
+        audioRenderer = null;
+        sampleSource = null;
+
+    }
 
     /**
      * DiskCacheのディレクトリ名。
@@ -84,7 +185,7 @@ public class CustomVideoSurfaceView extends FrameLayout implements TextureView.S
     float aspect;
     ViewGroup.LayoutParams layoutParams;
     private ProgressBar progressA, progressB;
-    private SurfaceView videoView;
+    private SurfaceView videoSurfaceView;
 
     /**
      * {@link android.os.Handler Handler}。
@@ -127,39 +228,13 @@ public class CustomVideoSurfaceView extends FrameLayout implements TextureView.S
      * {@inheritDoc}
      */
     @Override
-    public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-//        setSurface(surface);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-//        setSurface(surface);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-        return false;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-//        setSurface(surface);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
     public void onClick(View v) {
+        if(player.getPlaybackState() != ExoPlayer.STATE_ENDED){
+            player.stop();
+        }else {
+            player.seekTo(0);
+        }
+
 //        MediaPlayer player = this.player;
 //        if (player.isPlaying()) {
 //            player.pause();
@@ -411,6 +486,8 @@ public class CustomVideoSurfaceView extends FrameLayout implements TextureView.S
 //        setSurfaceTextureListener(this);
 //        player = new MediaPlayer();
 
+        appContext = context.getApplicationContext();
+
         // 画面の中央位置を取得する。
         Display display = ((WindowManager) getContext().getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
         Point point = new Point();
@@ -442,10 +519,14 @@ public class CustomVideoSurfaceView extends FrameLayout implements TextureView.S
         videoLayoutParams.gravity = Gravity.CENTER;
         videoView.setLayoutParams(videoLayoutParams);
 
-        addView(videoView);
-//        videoView.setAlpha(0);
-        this.videoView = videoView;
 
+        addView(videoView);
+        videoSurfaceView = videoView;
+        videoSurfaceView.setAlpha(0);
+        videoSurfaceView.setOnClickListener(this);
+
+
+        initializeVideoPlayer(appContext);
 
 //        createDiskCache();
 //        setOnClickListener(this);
@@ -546,6 +627,72 @@ public class CustomVideoSurfaceView extends FrameLayout implements TextureView.S
 //            }
 //        });
 //    }
+    private void initializeVideoPlayer(Context context) {
+        mainHandler = new Handler();
+
+
+        allocator = new DefaultAllocator(BUFFER_SEGMENT_SIZE);
+        dataSource =
+                new DefaultUriDataSource(appContext,
+                        new DefaultBandwidthMeter(mainHandler, null),
+                        Util.getUserAgent(appContext, "ExoPlayerDemo"));
+
+
+        videoSurfaceView.getHolder().addCallback(this);
+
+        CookieHandler currentHandler = CookieHandler.getDefault();
+        if (currentHandler != defaultCookieManager) {
+            CookieHandler.setDefault(defaultCookieManager);
+        }
+
+        audioCapabilitiesReceiver = new AudioCapabilitiesReceiver(appContext, this);
+        audioCapabilitiesReceiver.register();
+
+        player = ExoPlayer.Factory.newInstance(2);
+        player.addListener(new ExoPlayer.Listener() {
+            @Override
+            public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+                String text = "playWhenReady=" + playWhenReady + ", playbackState=";
+                switch (playbackState) {
+                    case ExoPlayer.STATE_BUFFERING:
+                        text += "buffering";
+                        setVisibility(VISIBLE);
+                        videoSurfaceView.setAlpha(0);
+
+                        break;
+                    case ExoPlayer.STATE_ENDED:
+                        player.seekTo(0);
+                        text += "ended";
+                        break;
+                    case ExoPlayer.STATE_IDLE:
+                        text += "idle";
+                        break;
+                    case ExoPlayer.STATE_PREPARING:
+                        text += "preparing";
+                        break;
+                    case ExoPlayer.STATE_READY:
+                        videoSurfaceView.setAlpha(1);
+                        text += "ready";
+                        break;
+                    default:
+                        text += "unknown";
+                        break;
+                }
+
+                Log.d("20672067", text);
+
+            }
+
+            @Override
+            public void onPlayWhenReadyCommitted() {
+            }
+
+            @Override
+            public void onPlayerError(ExoPlaybackException error) {
+            }
+        });
+
+    }
 
     /**
      * {@link android.media.MediaPlayer MediaPlayer}のステータスをリセットする。
@@ -588,11 +735,63 @@ public class CustomVideoSurfaceView extends FrameLayout implements TextureView.S
     }
 
     public Surface getSurface() {
-        return videoView.getHolder().getSurface();
+        return videoSurfaceView.getHolder().getSurface();
     }
 
     public SurfaceHolder getSurfaceHold() {
-        return videoView.getHolder();
+        return videoSurfaceView.getHolder();
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+        surfaceViewViable = true;
+        playVideo();
+
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+
+    }
+
+    @Override
+    public void onDroppedFrames(int count, long elapsed) {
+
+    }
+
+    @Override
+    public void onVideoSizeChanged(int width, int height, int unappliedRotationDegrees, float pixelWidthHeightRatio) {
+        calculateAspectRatio(width, height);
+    }
+
+    @Override
+    public void onDrawnToSurface(Surface surface) {
+
+    }
+
+    @Override
+    public void onDecoderInitializationError(MediaCodecTrackRenderer.DecoderInitializationException e) {
+
+    }
+
+    @Override
+    public void onCryptoError(MediaCodec.CryptoException e) {
+
+    }
+
+    @Override
+    public void onDecoderInitialized(String decoderName, long elapsedRealtimeMs, long initializationDurationMs) {
+
+    }
+
+    @Override
+    public void onAudioCapabilitiesChanged(AudioCapabilities audioCapabilities) {
+
     }
 
     /**

@@ -17,12 +17,13 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#888"
+    android:background="#f00"
     android:focusable="true"
     android:keepScreenOn="true">
 
 
     <FrameLayout
+        android:background="#f0f"
         android:id="@+id/video_frame"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
@@ -32,7 +33,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:adjustViewBounds="true"
-            android:background="@android:color/black"
+            android:background="#ff0"
             android:scaleType="fitCenter"
             android:src="@drawable/gallery_photo_8" />
 
