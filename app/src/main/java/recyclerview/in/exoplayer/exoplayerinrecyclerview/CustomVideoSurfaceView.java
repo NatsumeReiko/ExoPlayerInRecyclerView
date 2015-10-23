@@ -7,17 +7,15 @@ import android.net.Uri;
 import android.os.Handler;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.util.TypedValue;
 import android.view.Display;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
-import android.widget.ProgressBar;
 
 import com.google.android.exoplayer.ExoPlaybackException;
 import com.google.android.exoplayer.ExoPlayer;
@@ -26,6 +24,7 @@ import com.google.android.exoplayer.MediaCodecTrackRenderer;
 import com.google.android.exoplayer.MediaCodecVideoTrackRenderer;
 import com.google.android.exoplayer.audio.AudioCapabilities;
 import com.google.android.exoplayer.audio.AudioCapabilitiesReceiver;
+import com.google.android.exoplayer.audio.AudioTrack;
 import com.google.android.exoplayer.extractor.ExtractorSampleSource;
 import com.google.android.exoplayer.upstream.Allocator;
 import com.google.android.exoplayer.upstream.DataSource;
@@ -41,7 +40,10 @@ import java.net.CookiePolicy;
 /**
  * リストでの動画再生用にカスタマイズした特殊な{@link android.view.View View}。
  */
-public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabilitiesReceiver.Listener, MediaCodecVideoTrackRenderer.EventListener,
+public class CustomVideoSurfaceView extends FrameLayout
+        implements AudioCapabilitiesReceiver.Listener,
+        MediaCodecVideoTrackRenderer.EventListener,
+        MediaCodecAudioTrackRenderer.EventListener,
         SurfaceHolder.Callback, View.OnClickListener {
 
     //fields about video
@@ -64,9 +66,10 @@ public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabili
 
     private Context appContext;
 
-    public void preparePlayer(Uri uri) {
+    public void startPlayer(Uri uri) {
 
 
+        player.stop();
         // Build the sample source
         sampleSource =
                 new ExtractorSampleSource(uri, dataSource, allocator, 10 * BUFFER_SEGMENT_SIZE);
@@ -74,7 +77,7 @@ public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabili
         // Build the track renderers
         videoRenderer = new MediaCodecVideoTrackRenderer(sampleSource,
                 MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT, -1, mainHandler, this, -1);
-        audioRenderer = new MediaCodecAudioTrackRenderer(sampleSource);
+        audioRenderer = new MediaCodecAudioTrackRenderer(sampleSource, mainHandler, this);
 
         // Build the ExoPlayer and start playback
         player.prepare(videoRenderer, audioRenderer);
@@ -95,6 +98,7 @@ public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabili
     //release the player
     private void releasePlayer() {
         if (player != null) {
+
             player.release();
             player = null;
         }
@@ -151,26 +155,6 @@ public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabili
      */
 //    protected static final Object lock = new Object();
 
-    /**
-     * 動画の再生を行うための{@link android.media.MediaPlayer MediaPlayer}。
-     */
-//    protected MediaPlayer player;
-
-    /**
-     * G
-     * 再生している動画を描画するための{@link android.graphics.SurfaceTexture SurfaceTexture}。
-     */
-//    protected SurfaceTexture texture;
-
-    /**
-     * 再生している動画を描画するための{@link android.view.Surface Surface}。
-     */
-//    protected Surface surface;
-
-    /**
-     * 動画再生の準備が完了した時のイベントを受け取るリスナ。
-     */
-//    protected MediaPlayer.OnPreparedListener listener;
 
     /**
      * DiskCache。
@@ -183,19 +167,8 @@ public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabili
     protected int defaultWidth = 0;
     int videoWidth, videoHeight, viewWidth, viewHeight;
     float aspect;
-    ViewGroup.LayoutParams layoutParams;
-    private ProgressBar progressA, progressB;
+    FrameLayout.LayoutParams layoutParams;
     private SurfaceView videoSurfaceView;
-
-    /**
-     * {@link android.os.Handler Handler}。
-     */
-//    protected Handler handler;
-
-    /**
-     * レンダリングが始まった時実行される{@link java.lang.Runnable Runnable}。
-     */
-//    protected Runnable renderStart = null;
 
     /**
      * コンストラクタ。
@@ -229,11 +202,7 @@ public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabili
      */
     @Override
     public void onClick(View v) {
-        if(player.getPlaybackState() != ExoPlayer.STATE_ENDED){
-            player.stop();
-        }else {
-            player.seekTo(0);
-        }
+        player.setPlayWhenReady(!player.getPlayWhenReady());
 
 //        MediaPlayer player = this.player;
 //        if (player.isPlaying()) {
@@ -494,36 +463,40 @@ public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabili
         display.getSize(point);
         defaultWidth = point.x;
 
+        LayoutInflater inflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        this.addView(inflater.inflate(R.layout.exoplayer_video_surface_view, null));
 
-        final ProgressBar progressA = new ProgressBar(context);
-        final ProgressBar progressB = new ProgressBar(context);
+        videoSurfaceView = (SurfaceView) this.findViewById(R.id.video_surface_view);
+//        videoSurfaceView.setAlpha(0);
 
-        // ローディングのViewの属性を設定する。
-        int size = (int) (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, PROGRESS_SIZE, getResources().getDisplayMetrics()) + 0.5F);
-        FrameLayout.LayoutParams progressLayoutParams = new FrameLayout.LayoutParams(size, size);
-        progressLayoutParams.gravity = Gravity.CENTER;
-        progressA.setLayoutParams(progressLayoutParams);
-        progressA.setIndeterminateDrawable(getResources().getDrawable(R.drawable.progress));
-        progressB.setLayoutParams(progressLayoutParams);
-        progressB.setIndeterminateDrawable(getResources().getDrawable(R.drawable.progress_r));
-
-        addView(progressA);
-        addView(progressB);
-        this.progressA = progressA;
-        this.progressB = progressB;
-
-        final SurfaceView videoView = new SurfaceView(context);
-
-        FrameLayout.LayoutParams videoLayoutParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
-        videoLayoutParams.gravity = Gravity.CENTER;
-        videoView.setLayoutParams(videoLayoutParams);
-
-
-        addView(videoView);
-        videoSurfaceView = videoView;
-        videoSurfaceView.setAlpha(0);
-        videoSurfaceView.setOnClickListener(this);
+//        final ProgressBar progressA = new ProgressBar(context);
+//        final ProgressBar progressB = new ProgressBar(context);
+//
+//        // ローディングのViewの属性を設定する。
+//        int size = (int) (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, PROGRESS_SIZE, getResources().getDisplayMetrics()) + 0.5F);
+//        FrameLayout.LayoutParams progressLayoutParams = new FrameLayout.LayoutParams(size, size);
+//        progressLayoutParams.gravity = Gravity.CENTER;
+//        progressA.setLayoutParams(progressLayoutParams);
+//        progressA.setIndeterminateDrawable(getResources().getDrawable(R.drawable.progress));
+//        progressB.setLayoutParams(progressLayoutParams);
+//        progressB.setIndeterminateDrawable(getResources().getDrawable(R.drawable.progress_r));
+//
+//        addView(progressA);
+//        addView(progressB);
+//        this.progressA = progressA;
+//        this.progressB = progressB;
+//
+//        final SurfaceView videoView = new SurfaceView(context);
+//
+//        FrameLayout.LayoutParams videoLayoutParams = new FrameLayout.LayoutParams(
+//                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
+//        videoLayoutParams.gravity = Gravity.CENTER;
+//        videoView.setLayoutParams(videoLayoutParams);
+//
+//
+//        addView(videoView);
+//        videoSurfaceView = videoView;
+//        videoSurfaceView.setAlpha(0);
 
 
         initializeVideoPlayer(appContext);
@@ -658,6 +631,8 @@ public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabili
                         text += "buffering";
                         setVisibility(VISIBLE);
                         videoSurfaceView.setAlpha(0);
+                        videoSurfaceView.setOnClickListener(null);
+
 
                         break;
                     case ExoPlayer.STATE_ENDED:
@@ -671,6 +646,7 @@ public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabili
                         text += "preparing";
                         break;
                     case ExoPlayer.STATE_READY:
+                        videoSurfaceView.setOnClickListener(CustomVideoSurfaceView.this);
                         videoSurfaceView.setAlpha(1);
                         text += "ready";
                         break;
@@ -689,9 +665,19 @@ public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabili
 
             @Override
             public void onPlayerError(ExoPlaybackException error) {
+                Log.d("20672067", "somethingwrong:" + "onPlayerError:" + error.toString());
+
             }
         });
 
+
+
+    }
+
+    public void stopPlayer() {
+        if (player != null) {
+            player.stop();
+        }
     }
 
     /**
@@ -720,7 +706,7 @@ public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabili
 
         aspect = (float) videoWidth / videoHeight;
 
-        layoutParams = getLayoutParams();
+        layoutParams = (FrameLayout.LayoutParams) getLayoutParams();
 
         if (((float) viewWidth / videoWidth) > ((float) viewHeight / videoHeight)) {
             layoutParams.width = (int) (viewHeight * aspect + 0.5F);
@@ -730,6 +716,10 @@ public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabili
             layoutParams.height = (int) (viewWidth / aspect + 0.5F);
         }
 
+        layoutParams.gravity = Gravity.CENTER;
+
+
+        Log.d("20672067", "calculateAspectRatio:" + layoutParams.width + "--" + layoutParams.height);
 
         setLayoutParams(layoutParams);
     }
@@ -791,6 +781,19 @@ public class CustomVideoSurfaceView extends FrameLayout implements AudioCapabili
 
     @Override
     public void onAudioCapabilitiesChanged(AudioCapabilities audioCapabilities) {
+
+    }
+
+    @Override
+    public void onAudioTrackInitializationError(AudioTrack.InitializationException e) {
+        Log.d("20672067", "somethingwrong:" + "onAudioTrackInitializationError:" + e.toString());
+
+    }
+
+    @Override
+    public void onAudioTrackWriteError(AudioTrack.WriteException e) {
+        Log.d("20672067", "somethingwrong:" + "onAudioTrackWriteError:" + e.toString());
+
 
     }
 

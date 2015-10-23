@@ -2,13 +2,13 @@ package recyclerview.in.exoplayer.exoplayerinrecyclerview;
 
 import android.content.Context;
 import android.util.AttributeSet;
-import android.widget.ImageView;
+import android.widget.ImageButton;
 
 
 /**
  * 綺麗な正方形に表示できるようカスタマイズした特殊な{@link SquareImageView SquareCommonButton}。
  */
-public class SquareImageView extends ImageView {
+public class SquareImageView extends ImageButton {
 
     /**
      * {@inheritDoc}

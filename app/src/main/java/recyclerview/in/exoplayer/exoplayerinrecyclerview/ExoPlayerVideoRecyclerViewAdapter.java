@@ -22,6 +22,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,6 +56,10 @@ public class ExoPlayerVideoRecyclerViewAdapter
 
     private void setVideoViewHolder(VideoViewHolder holder) {
         holder.parent.setTag(holder);
+        holder.thumbnail.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        holder.thumbnail.setImageResource(R.drawable.common_icon);
+
+
     }
 
     @Override
@@ -66,11 +71,14 @@ public class ExoPlayerVideoRecyclerViewAdapter
 
         FrameLayout videoContainer;
         View parent;
+        SquareImageView thumbnail;
 
         public VideoViewHolder(View v) {
             super(v);
             parent = v;
-            videoContainer = (FrameLayout) v.findViewById(R.id.video_frame);
+            videoContainer = (FrameLayout) v.findViewById(R.id.video_layout);
+            thumbnail = (SquareImageView) v.findViewById(R.id.thumbnail);
+
         }
     }
 

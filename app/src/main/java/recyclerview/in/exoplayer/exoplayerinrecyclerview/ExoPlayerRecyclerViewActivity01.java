@@ -19,6 +19,8 @@ package recyclerview.in.exoplayer.exoplayerinrecyclerview;
 import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.v7.widget.LinearLayoutManager;
 
 
@@ -51,15 +53,22 @@ public class ExoPlayerRecyclerViewActivity01 extends Activity {
         }
 
         recycleView = (ExoPlayerVideoRecyclerView) findViewById(R.id.video_demo_recycler_list);
-        recycleView.setVideoInfoList(videoInfoList);
 
         LinearLayoutManager mLayoutManager = new LinearLayoutManager(appContext, VERTICAL, false);
         mLayoutManager.setSmoothScrollbarEnabled(true);
-        mLayoutManager.setStackFromEnd(true);
         recycleView.setLayoutManager(mLayoutManager);
 
         adapter = new ExoPlayerVideoRecyclerViewAdapter(this, videoInfoList);
         recycleView.setAdapter(adapter);
+        recycleView.setVideoInfoList(videoInfoList);
+
+
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                recycleView.playVideo();
+            }
+        });
 
     }
 
@@ -79,6 +88,8 @@ public class ExoPlayerRecyclerViewActivity01 extends Activity {
         if (recycleView != null) {
             recycleView.setAdapter(null);
             recycleView.onRelease();
+
+            recycleView = null;
         }
 
         super.onDestroy();
