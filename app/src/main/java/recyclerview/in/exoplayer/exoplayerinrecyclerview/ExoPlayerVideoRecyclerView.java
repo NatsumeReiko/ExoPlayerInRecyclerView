@@ -22,6 +22,7 @@ import android.net.Uri;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.Display;
 import android.view.View;
 import android.view.ViewGroup;
@@ -35,8 +36,8 @@ import java.util.List;
 public class ExoPlayerVideoRecyclerView extends RecyclerView {
 
     private List<VideoInfo> videoInfoList = new ArrayList<>();
-    private int videoSurfacedefaultHeight = 0;
-    private int screendefaultHeight = 0;
+    private int videoSurfaceDefaultHeight = 0;
+    private int screenDefaultHeight = 0;
 
     //surface view for playing video
     private CustomVideoSurfaceView videoSurfaceView;
@@ -113,15 +114,14 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView {
         }
     }
 
-    private void checkVideoSurfaceOutOfScreen() {
-
-    }
-
     //play the video in the row
     public void playVideo() {
-
         int startPosition = ((LinearLayoutManager) getLayoutManager()).findFirstVisibleItemPosition();
         int endPosition = ((LinearLayoutManager) getLayoutManager()).findLastVisibleItemPosition();
+
+        if (endPosition - startPosition > 1) {
+            endPosition = startPosition + 1;
+        }
 
         if (startPosition < 0 || endPosition < 0) {
             return;
@@ -132,8 +132,14 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView {
             int startPositionVideoHeight = getVisibleVideoSurfaceHeight(startPosition);
             int endPositionVideoHeight = getVisibleVideoSurfaceHeight(endPosition);
             targetPosition = startPositionVideoHeight > endPositionVideoHeight ? startPosition : endPosition;
+
+            Log.d("20672067Position", " startPosition:" + startPosition + " endPosition:" + endPosition);
+            Log.d("20672067Position", " startPositionVideoHeight:" + startPositionVideoHeight + " endPositionVideoHeight:" + endPositionVideoHeight);
+            Log.d("20672067Position", " startPosition != endPosition:" + " targetPosition:" + targetPosition);
+
         } else {
             targetPosition = startPosition;
+            Log.d("20672067Position", " startPosition == endPosition:" + " targetPosition:" + targetPosition);
         }
 
         if (targetPosition < 0 || targetPosition == playPosition) {
@@ -141,7 +147,6 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView {
         }
         playPosition = targetPosition;
         videoSurfaceView.setVisibility(INVISIBLE);
-        videoSurfaceView.stopPlayer();
         removeVideoView(videoSurfaceView);
 
         // get target View targetPosition in RecyclerView
@@ -178,9 +183,9 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView {
         child.getLocationInWindow(location01);
 
         if (location01[1] < 0) {
-            return location01[1] + videoSurfacedefaultHeight;
+            return location01[1] + videoSurfaceDefaultHeight;
         } else {
-            return screendefaultHeight - location01[1];
+            return screenDefaultHeight - location01[1];
         }
     }
 
@@ -193,10 +198,10 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView {
         Display display = ((WindowManager) getContext().getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
         Point point = new Point();
         display.getSize(point);
-        videoSurfacedefaultHeight = point.x;
-        screendefaultHeight = point.y;
+        videoSurfaceDefaultHeight = point.x;
+        screenDefaultHeight = point.y;
 
-        videoSurfaceView = new CustomVideoSurfaceView(appContext);
+        videoSurfaceView = CustomVideoSurfaceView.getInstance(appContext);
 
         addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
@@ -232,6 +237,22 @@ public class ExoPlayerVideoRecyclerView extends RecyclerView {
 
             }
         });
+    }
+
+    public void onPausePlayer() {
+        if (videoSurfaceView != null) {
+            removeVideoView(videoSurfaceView);
+            videoSurfaceView.onRelease();
+            videoSurfaceView = null;
+        }
+    }
+
+    public void onRestartPlayer() {
+        if (videoSurfaceView == null) {
+            playPosition = -1;
+            videoSurfaceView = CustomVideoSurfaceView.getInstance(appContext);
+            playVideo();
+        }
     }
 
     /**

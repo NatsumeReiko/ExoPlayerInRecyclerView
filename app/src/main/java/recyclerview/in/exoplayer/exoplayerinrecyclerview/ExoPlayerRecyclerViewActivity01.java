@@ -23,7 +23,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.support.v7.widget.LinearLayoutManager;
 
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -37,6 +36,8 @@ public class ExoPlayerRecyclerViewActivity01 extends Activity {
 
     private ExoPlayerVideoRecyclerView recycleView;
 
+    private boolean firstTime = true;
+
     private Context appContext;
 
 
@@ -49,27 +50,53 @@ public class ExoPlayerRecyclerViewActivity01 extends Activity {
         appContext = getApplicationContext();
 
         for (int index = 0; index < 100; index++) {
+
             videoInfoList.add(new VideoInfo("http://html5demos.com/assets/dizzy.mp4"));
         }
-
         recycleView = (ExoPlayerVideoRecyclerView) findViewById(R.id.video_demo_recycler_list);
-
-        LinearLayoutManager mLayoutManager = new LinearLayoutManager(appContext, VERTICAL, false);
-        mLayoutManager.setSmoothScrollbarEnabled(true);
-        recycleView.setLayoutManager(mLayoutManager);
+        recycleView.setVideoInfoList(videoInfoList);
+        recycleView.setLayoutManager(new LinearLayoutManager(appContext, VERTICAL, false));
 
         adapter = new ExoPlayerVideoRecyclerViewAdapter(this, videoInfoList);
         recycleView.setAdapter(adapter);
-        recycleView.setVideoInfoList(videoInfoList);
 
 
-        new Handler(Looper.getMainLooper()).post(new Runnable() {
-            @Override
-            public void run() {
-                recycleView.playVideo();
-            }
-        });
+    }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        if(recycleView != null){
+            recycleView.onPausePlayer();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if(firstTime){
+            new Handler(Looper.getMainLooper()).post(new Runnable() {
+                @Override
+                public void run() {
+                    recycleView.playVideo();
+                }
+            });
+
+            firstTime = false;
+        }
+
+
+    }
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+
+        if(recycleView != null){
+            recycleView.onRestartPlayer();
+        }
     }
 
     @Override
